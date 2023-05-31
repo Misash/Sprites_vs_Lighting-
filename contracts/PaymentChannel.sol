@@ -1,28 +1,32 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.20;
+
+import "hardhat/console.sol";
+
+// no concurrent payments
+// payment channel off-chain
 
 contract PaymentChannel {
-    // Blocks for grace period
+    // Blocks for grace period to finalize the channel
     uint constant DELTA = 10;
 
     // Events
-    event EventInit();
-    event EventUpdate(int r);
-    event LogBytes32(bytes32 b);
-    event EventPending(uint T1, uint T2);
+    event EventInit(); //initialice contract
+    event EventUpdate(int r); //update channel
+    event LogBytes32(bytes32 b); // register byte32 in the contract
+    event EventPending(uint T1, uint T2); // pending state
 
-    // Functions
+    ///################################# MODIFIERS ######################################
     modifier after_(uint T) {
         require(T > 0 && block.number >= T, "Invalid block number");
         _;
     }
-
     modifier before(uint T) {
         require(T == 0 || block.number < T, "Invalid block number");
         _;
     }
-
     modifier onlyplayers() {
-        require(playermap[msg.sender] > 0, "Not a player");
+        require(playermap[msg.sender] > 0, "Unauthorized player");
         _;
     }
 
@@ -48,7 +52,11 @@ contract PaymentChannel {
         require(pub == ecrecover(h, v, r, s), "Invalid signature");
     }
 
+    ///################################# END MODIFIERS ######################################
+
+    ///////////////////////////////
     // State channel data
+    ///////////////////////////////
     int bestRound = -1;
     enum Status {
         OK,
@@ -57,41 +65,45 @@ contract PaymentChannel {
     Status public status;
     uint deadline;
 
-    // Constant
+    // Constant (set in constructor)
     address[2] public players;
     mapping(address => uint) playermap;
 
-    // Payment Channel
+    /////////////////////////////////////
+    // Payment Channel - Application specific data
+    ////////////////////////////////////
 
     // State channel states
     int[2] public credits;
     uint[2] public withdrawals;
 
-    // Externally states
-    uint[2] public deposits;
-    uint[2] public withdrawn;
-
-    //deprecated
-    // function sha3int(int r) internal pure returns (bytes32) {
-    //     return keccak256(abi.encode(r));
-    // }
+    // Externally affected states
+    uint[2] public deposits; // Monotonic, only incremented by deposit() function
+    uint[2] public withdrawn; // Monotonic, only incremented by withdraw() function
 
     constructor(address[2] memory _players) {
         for (uint i = 0; i < 2; i++) {
             players[i] = _players[i];
-            playermap[_players[i]] = i + 1;
+            playermap[_players[i]] = i + 1; // address -> id [1...]
         }
         emit EventInit();
     }
 
-    // Increment on new deposit
-    function deposit() payable onlyplayers external {
+    function sha3int(int r) public pure returns (bytes32) {
+        return keccak256(abi.encode(r)); //int to byte -> hash
+    }
+
+    // Increment on new deposit -> payable = recieve eth
+    function deposit() public payable onlyplayers {
+        // console.log("msg-deposit: ", msg);
+        // console.log("msg-deposit: ", msg);
         deposits[playermap[msg.sender] - 1] += msg.value;
     }
 
+
     // Increment on withdrawal
-    function withdraw() onlyplayers external {
-        uint i = playermap[msg.sender] - 1;
+    function withdraw() public onlyplayers {
+        uint i = playermap[msg.sender]-1;
         uint toWithdraw = withdrawals[i] - withdrawn[i];
         withdrawn[i] = withdrawals[i];
         require(payable(msg.sender).send(toWithdraw), "Withdrawal failed");
@@ -103,17 +115,16 @@ contract PaymentChannel {
         int r,
         int[2] memory _credits,
         uint[2] memory _withdrawals
-    ) onlyplayers external {
+    ) public onlyplayers {
         // Only update to states with larger round number
         if (r <= bestRound) return;
 
         // Check the signature of the other party
         uint i = (3 - playermap[msg.sender]) - 1;
-        // bytes32 _h = sha3int(r, _credits, _withdrawals);
         bytes32 _h = keccak256(abi.encode(r, _credits, _withdrawals));
-        bytes32 S = bytes32(sig[2]);
         uint8 V = uint8(sig[0]);
         bytes32 R = bytes32(sig[1]);
+        bytes32 S = bytes32(sig[2]);
         verifySignature(players[i], _h, V, R, S);
 
         // Update the state
@@ -126,18 +137,18 @@ contract PaymentChannel {
     }
 
     // Causes a timeout for the finalize time
-    function trigger() onlyplayers external {
-        require(status == Status.OK, "Invalid status");
+    function trigger() public onlyplayers {
+        assert(status == Status.OK);
         status = Status.PENDING;
-        deadline = block.number + DELTA; // onchain
+        deadline = block.number + DELTA; // Set the deadline for collecting inputs or updates
         emit EventPending(block.number, deadline);
     }
 
-    function finalize() external {
+    function finalize() public {
         require(status == Status.PENDING, "Invalid status");
         require(block.number > deadline, "Deadline not reached");
 
-        // Idempotent, may be called multiple times
+        // Note: Is idempotent, may be called multiple times
 
         // Withdraw the maximum amount of money
         withdrawals[0] += uint(int(deposits[0]) + credits[0]);
