@@ -1,18 +1,16 @@
-// We require the Hardhat Runtime Environment explicitly here. This is optional
-// but useful for running the script in a standalone fashion through `node <script>`.
-//
-// You can also run a script with `npx hardhat run <script>`. If you do that, Hardhat
-// will compile your contracts, add the Hardhat Runtime Environment's members to the
-// global scope, and execute the script.
+
+const player1 = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+const player2 = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
 
 async function main() {
-  // Retrieve the contract factory
-  const Counter = await ethers.getContractFactory("Counter");
+  const [deployer] = await ethers.getSigners();
 
-  // Deploy the contract
-  const counter = await Counter.deploy();
+  console.log("Desplegando contrato con el siguiente signatario:", deployer.address);
 
-  console.log("Contract deployed to address:", counter.address);
+  const PaymentChannel = await ethers.getContractFactory("PaymentChannel");
+  const paymentChannel = await PaymentChannel.deploy([player1, player2]); // Reemplaza player1 y player2 con las direcciones de los jugadores
+
+  console.log("Contrato desplegado en:", paymentChannel.address);
 }
 
 main()

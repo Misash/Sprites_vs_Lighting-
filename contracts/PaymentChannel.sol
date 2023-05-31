@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.17;
 
 import "hardhat/console.sol";
 
@@ -9,6 +9,9 @@ import "hardhat/console.sol";
 contract PaymentChannel {
     // Blocks for grace period to finalize the channel
     uint constant DELTA = 10;
+
+    //Log
+    event LogDebug(uint i, bytes32 _h, uint8 V, bytes32 R, bytes32 S);
 
     // Events
     event EventInit(); //initialice contract
@@ -30,9 +33,9 @@ contract PaymentChannel {
         _;
     }
 
-    // function assert(bool b) internal pure {
-    //     require(b, "Assertion failed");
-    // }
+    function assert(bool b) internal pure {
+        require(b, "Assertion failed");
+    }
 
     function max(uint a, uint b) internal pure returns (uint) {
         return a > b ? a : b;
@@ -57,7 +60,7 @@ contract PaymentChannel {
     ///////////////////////////////
     // State channel data
     ///////////////////////////////
-    int bestRound = -1;
+    int public bestRound = -1;
     enum Status {
         OK,
         PENDING
@@ -100,10 +103,9 @@ contract PaymentChannel {
         deposits[playermap[msg.sender] - 1] += msg.value;
     }
 
-
     // Increment on withdrawal
     function withdraw() public onlyplayers {
-        uint i = playermap[msg.sender]-1;
+        uint i = playermap[msg.sender] - 1;
         uint toWithdraw = withdrawals[i] - withdrawn[i];
         withdrawn[i] = withdrawals[i];
         require(payable(msg.sender).send(toWithdraw), "Withdrawal failed");
@@ -112,19 +114,24 @@ contract PaymentChannel {
     // State channel update function
     function update(
         uint[3] memory sig,
-        int r,
+        int currentRound,
         int[2] memory _credits,
         uint[2] memory _withdrawals
     ) public onlyplayers {
         // Only update to states with larger round number
-        if (r <= bestRound) return;
+        if (currentRound <= bestRound) return;
 
         // Check the signature of the other party
         uint i = (3 - playermap[msg.sender]) - 1;
-        bytes32 _h = keccak256(abi.encode(r, _credits, _withdrawals));
+        bytes32 _h = keccak256(
+            abi.encode(currentRound, _credits, _withdrawals)
+        );
         uint8 V = uint8(sig[0]);
         bytes32 R = bytes32(sig[1]);
         bytes32 S = bytes32(sig[2]);
+
+        emit LogDebug(i, _h, V, R, S);
+
         verifySignature(players[i], _h, V, R, S);
 
         // Update the state
@@ -132,8 +139,8 @@ contract PaymentChannel {
         credits[1] = _credits[1];
         withdrawals[0] = _withdrawals[0];
         withdrawals[1] = _withdrawals[1];
-        bestRound = r;
-        emit EventUpdate(r);
+        bestRound = currentRound;
+        emit EventUpdate(currentRound);
     }
 
     // Causes a timeout for the finalize time
