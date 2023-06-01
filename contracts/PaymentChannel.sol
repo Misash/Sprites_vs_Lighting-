@@ -33,9 +33,9 @@ contract PaymentChannel {
         _;
     }
 
-    function assert(bool b) internal pure {
-        require(b, "Assertion failed");
-    }
+    // function assert(bool b) internal pure {
+    //     require(b, "Assertion failed");
+    // }
 
     function max(uint a, uint b) internal pure returns (uint) {
         return a > b ? a : b;
@@ -101,6 +101,10 @@ contract PaymentChannel {
         // console.log("msg-deposit: ", msg);
         // console.log("msg-deposit: ", msg);
         deposits[playermap[msg.sender] - 1] += msg.value;
+
+        //increment credit
+        // credits[playermap[msg.sender] - 1] += msg.value;
+        withdrawals[playermap[msg.sender] - 1] += msg.value;
     }
 
     // Increment on withdrawal
@@ -130,17 +134,19 @@ contract PaymentChannel {
         bytes32 R = bytes32(sig[1]);
         bytes32 S = bytes32(sig[2]);
 
-        emit LogDebug(i, _h, V, R, S);
+        console.log("i: ",i);
+        console.log("h: ");
+        console.logBytes32(_h);
 
-        verifySignature(players[i], _h, V, R, S);
+        // verifySignature(players[i], _h, V, R, S);
 
-        // Update the state
-        credits[0] = _credits[0];
-        credits[1] = _credits[1];
-        withdrawals[0] = _withdrawals[0];
-        withdrawals[1] = _withdrawals[1];
-        bestRound = currentRound;
-        emit EventUpdate(currentRound);
+        // // Update the state
+        // credits[0] = _credits[0];
+        // credits[1] = _credits[1];
+        // withdrawals[0] = _withdrawals[0];
+        // withdrawals[1] = _withdrawals[1];
+        // bestRound = currentRound;
+        // emit EventUpdate(currentRound);
     }
 
     // Causes a timeout for the finalize time
