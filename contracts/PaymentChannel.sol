@@ -10,9 +10,6 @@ contract PaymentChannel {
     // Blocks for grace period to finalize the channel
     uint constant DELTA = 10;
 
-    //Log
-    event LogDebug(uint i, bytes32 _h, uint8 V, bytes32 R, bytes32 S);
-
     // Events
     event EventInit(); //initialice contract
     event EventUpdate(int r); //update channel
@@ -51,8 +48,12 @@ contract PaymentChannel {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) internal pure {
-        require(pub == ecrecover(h, v, r, s), "Invalid signature");
+    ) internal pure  {
+        bytes32 messageHash = keccak256(
+            abi.encodePacked("\x19Ethereum Signed Message:\n32", h)
+        );
+        address recoveredAddress = ecrecover(messageHash, v, r, s);
+         require(recoveredAddress == pub, "Invalid signature");
     }
 
     ///################################# END MODIFIERS ######################################
@@ -104,7 +105,7 @@ contract PaymentChannel {
 
         //increment credit
         // credits[playermap[msg.sender] - 1] += msg.value;
-        withdrawals[playermap[msg.sender] - 1] += msg.value;
+        withdrawals[playermap[msg.sender] - 1] += msg.value;// edite
     }
 
     // Increment on withdrawal
@@ -130,23 +131,30 @@ contract PaymentChannel {
         bytes32 _h = keccak256(
             abi.encode(currentRound, _credits, _withdrawals)
         );
+        // bytes32 _h = sha3int(currentRound);
         uint8 V = uint8(sig[0]);
         bytes32 R = bytes32(sig[1]);
         bytes32 S = bytes32(sig[2]);
 
-        console.log("i: ",i);
-        console.log("h: ");
-        console.logBytes32(_h);
+        // console.log("i: ", i);
+        // console.log("h: ");
+        // console.logBytes32(_h);
+        // console.log("V: ");
+        // console.log(V);
+        // console.log("R: ");
+        // console.logBytes32(R);
+        // console.log("S: ");
+        // console.logBytes32(S);
 
-        // verifySignature(players[i], _h, V, R, S);
+        verifySignature(players[i], _h, V, R, S);
 
-        // // Update the state
-        // credits[0] = _credits[0];
-        // credits[1] = _credits[1];
-        // withdrawals[0] = _withdrawals[0];
-        // withdrawals[1] = _withdrawals[1];
-        // bestRound = currentRound;
-        // emit EventUpdate(currentRound);
+        // Update the state
+        credits[0] = _credits[0];
+        credits[1] = _credits[1];
+        withdrawals[0] = _withdrawals[0];
+        withdrawals[1] = _withdrawals[1];
+        bestRound = currentRound;
+        emit EventUpdate(currentRound);
     }
 
     // Causes a timeout for the finalize time
@@ -159,6 +167,8 @@ contract PaymentChannel {
 
     function finalize() public {
         require(status == Status.PENDING, "Invalid status");
+        console.log("block.number: ", block.number);
+        console.log("deadline: ", deadline);
         require(block.number > deadline, "Deadline not reached");
 
         // Note: Is idempotent, may be called multiple times
