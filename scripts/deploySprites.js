@@ -1,5 +1,60 @@
 const { ethers } = require("hardhat");
 const delta = 10; // Número de bloques para que expire el hash
+const HashTable = require('./HashTable.js');
+
+class Player {
+    constructor(_address) {
+        this.address = _address;
+    }
+}
+
+class Node {
+    constructor(data) {
+        this.data = data;
+        this.next = null;
+    }
+}
+
+
+class Network {
+
+    nodes = new HashTable();
+    edges = [];
+
+    //nodos
+    constructor() {
+        //establecer participantes
+    }
+
+
+    removeNode(adressPlayer) {
+        this.nodes.remove(adressPlayer);
+    }
+
+    async createChannel(player1Address, player2Address, [coins1, coins2]) {
+        //verificar si existen
+        if (!this.nodes.exist(player1Address) || !this.nodes.exist(player2Address)) return false
+
+        // Desplegar el contrato SpriteChannel
+        const SpriteChannel = await ethers.getContractFactory("ConditionalChannel");
+        const spriteChannel = await SpriteChannel.deploy([player1Address, player2Address]);
+        await spriteChannel.deployed();
+
+        // Hacer un depósito en el canal para ambas partes
+        await spriteChannel.connect(player1Address).deposit({ value: coins1 });
+        await spriteChannel.connect(player2Address).deposit({ value: coins2 });
+
+        //relacionar players de forma bidireccional
+        this.nodes.set(player1Address,player2Address);
+        this.nodes.set(player2Address,player1Address);
+
+        // Agregar el canal como un edge en el grafo
+        this.edges.push(spriteChannel);
+
+    }
+
+}
+
 
 
 async function main() {
@@ -47,7 +102,7 @@ async function main() {
         [Round, hash, direction, amount]
     );
 
-    
+
 
     //alice envia el preimage
     let currentBlock = await PM.connect(alice).submitPreimage(messageHash);
