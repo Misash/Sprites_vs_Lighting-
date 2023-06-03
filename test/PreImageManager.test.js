@@ -16,6 +16,8 @@ describe("PreImageManager", function () {
         console.log("PreImage deployed to:", preImageManager.address);
     });
 
+    
+
 
     // it("should initialize the contract correctly", async function () {
     //     expect(await preImage.players(0)).to.equal(players[0].address);

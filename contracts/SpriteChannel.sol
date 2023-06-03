@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
 
+import "hardhat/console.sol";
+
 // External interface
 interface PreimageManager {
     function submitPreimage(bytes32 x) external;
     function revealedBefore(bytes32 h, uint T) external view returns (bool);
+    function getTimestamp(bytes32 x) external view returns (uint256);
 }
 
 // Note: Initial version does NOT support concurrent conditional payments!
@@ -33,9 +36,9 @@ contract SpriteChannel {
         _;
     }
 
-    function assert(bool b) internal pure {
-        require(b, "Assertion failed");
-    }
+    // function assert(bool b) internal pure {
+    //     require(b, "Assertion failed");
+    // }
 
     function max(uint256 a, uint256 b) internal pure returns (uint256) {
         return a > b ? a : b;
@@ -141,7 +144,9 @@ contract SpriteChannel {
         bytes32 R = bytes32(sig[1]);
         bytes32 S = bytes32(sig[2]);
 
+        //verifiec with bob signature
         verifySignature(players[i], _h, V, R, S);
+        
 
         // Update the state
         credits[0] = _credits[0];
@@ -152,6 +157,8 @@ contract SpriteChannel {
         hash = _hash;
         expiry = _expiry;
         bestRound = r;
+        console.log("update state succesfully with round: ");
+        console.logInt(r);
         emit EventUpdate(r);
     }
 
@@ -174,9 +181,9 @@ contract SpriteChannel {
         if (amount > 0 && block.number > expiry) {
             // Completes on-chain
             if (pm.revealedBefore(hash, expiry))
-                withdrawals[1] += amount;
+                withdrawals[1] += amount;// bob could withdraw
                 // Cancels off-chain
-            else withdrawals[0] += amount;
+            else withdrawals[0] += amount; // alice cancel the payment
             amount = 0;
             hash = 0;
             expiry = 0;

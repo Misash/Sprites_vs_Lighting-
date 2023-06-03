@@ -4,10 +4,10 @@ pragma solidity ^0.8.17;
 import "hardhat/console.sol";
 
 contract PreimageManager {
-    mapping(bytes32 => uint256) timestamp;
+    mapping(bytes32 => uint256) public timestamp;
 
     // block = 15 seconds
-    //save the block where the preimage was revealed
+    //save the block where the preim0age was revealed
     function submitPreimage(bytes32 x) external {
         if (timestamp[keccak256(abi.encode(x))] == 0) {
             timestamp[keccak256(abi.encode(x))] = block.number;
