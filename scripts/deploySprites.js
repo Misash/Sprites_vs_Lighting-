@@ -16,12 +16,12 @@ async function main() {
 
     // Obtener una instancia existente del contrato PreimageManager
     const preimageManagerAddress = preimageManager.address; // Dirección del contrato PreimageManager existente
-    const PM = await ethers.getContractAt("contracts/SpriteChannel.sol:PreimageManager", preimageManagerAddress);
+    const PM = await ethers.getContractAt("contracts/ConditionalChannel.sol:PreimageManager", preimageManagerAddress);
 
 
     // Desplegar el contrato SpriteChannel
-    const SpriteChannel = await ethers.getContractFactory("SpriteChannel");
-    const spriteChannel = await SpriteChannel.deploy(preimageManager.address, [
+    const SpriteChannel = await ethers.getContractFactory("ConditionalChannel");
+    const spriteChannel = await SpriteChannel.deploy([
         alice.address,
         bob.address,
     ]);
@@ -32,87 +32,56 @@ async function main() {
     await spriteChannel.connect(alice).deposit({ value: ethers.utils.parseEther("10") });
     await spriteChannel.connect(bob).deposit({ value: ethers.utils.parseEther("15") });
 
-    // Realizar múltiples transacciones entre las partes
 
-    // await network.provider.send("evm_mine");
+
+    //Realizar múltiples transacciones entre las partes
+
+    //alice envia el preimage y firma con la direccion de bob
+    let Round = 1;
+    let amount = ethers.utils.parseEther("2");
+    let hash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("secret"));
+    let direction = [0, 1]; // alice -> bob
+    // Generar la firma válida 
+    const messageHash = ethers.utils.solidityKeccak256(
+        ["uint", "bytes32", "int[2]", "uint"],
+        [Round, hash, direction, amount]
+    );
+
+    
+
     //alice envia el preimage
-    let hash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("hash"));
-    let expiry = await ethers.provider.getBlockNumber() + delta; // Set a threshold 10 blocks into the future
-    await PM.connect(alice).submitPreimage(hash);
-    console.log("Alice envia el preimage")
-    console.log("Preimage enviado:", hash);
-    console.log("expiry:", expiry);
+    let currentBlock = await PM.connect(alice).submitPreimage(messageHash);
+    let deadline = currentBlock.blockNumber + delta;
+    console.log("currentBlock: ", currentBlock.blockNumber);
+    console.log("deadline: ", deadline);
 
-    //bob verifica el preimage
-    const storedTimestamp = await PM.connect(bob).getTimestamp(hash);
-    console.log("Bob verifica el preimage")
-    console.log("Stored Timestamp:", storedTimestamp);
+    //bob tiene delta tiempo para revelar el preimage
 
-    //mostrar todo el map
-    const keys = await PM.timestamp.call(Object.keys);
-
-    for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
-        const value = await PM.timestamp.call(key);
-        console.log(`Key: ${key}, Value: ${value}`);
+    for (let i = currentBlock.blockNumber; i < deadline; i++) {
+        if (i == deadline - 1) {
+            //bob revela el preimage
+            await PM.connect(bob).revealPreimage(messageHash);
+        }
+        await network.provider.send("evm_mine");
     }
 
+    let revealPreimage = await PM.revealedBefore(messageHash, deadline);
+
+    if (revealPreimage) {
+        console.log("Bob SI revelo el preimage antes del deadline");
+        //actualizar el estado del channel
+        await spriteChannel.update(Round, hash, direction, amount);
+    } else {
+        console.log("Bob No revelo el preimage antes del deadline!!!!");
+    }
+
+    //bob envia 5 eth a alice
 
 
-    //alice llama a update 
-
-    // let Round = 1;
-    // let credits = [0, 0];
-    // let withdrawals = [0, 0];
-    // let amount = ethers.utils.parseEther("2");
-
-    // // Generar la firma válida 
-    // const messageHash = ethers.utils.solidityKeccak256(
-    //     ["int", "int[2]", "uint[2]", "bytes32", "uint", "uint"],
-    //     [Round, credits, withdrawals, hash, expiry, amount]
-    // );
-
-    // const messageHashBytes = ethers.utils.arrayify(messageHash);
-    // console.log("H:", messageHash);
-
-    // //alice firma el mensaje con la direccion de bob para q se verifique
-    // const signature = await bob.signMessage(messageHashBytes);
-    // const { v, r, s } = ethers.utils.splitSignature(signature);
-
-    // let tx = await spriteChannel.connect(alice).update(
-    //     [v, r, s], // Pasar la firma válida generada
-    //     Round,
-    //     credits,
-    //     withdrawals,
-    //     hash,
-    //     expiry,
-    //     amount
-    // );
-
-    // // Obtén los eventos emitidos
-    // let result = await tx.wait();
-    // console.log("Eventos:", result.logs);
+    //alice finaliza el canal
+    await spriteChannel.connect(alice).finalize();
 
 
-    //  Bob quiere finalizar
-
-    // spriteChannel.trigger();
-
-    //periodo delta 
-    //alice o bob pueden finalizar sus pagos
-    // for(let i = 0; i < delta; i++){
-    //     await network.provider.send("evm_mine");
-    //     if(i == 5){
-    //         spriteChannel.connect(alice).finalize();
-    //     }
-    // }
-
-
-
-    //   console.log("Depósito de cuenta 1:", (await spriteChannel.deposits(0)).toString());
-    //   console.log("Depósito de cuenta 2:", (await spriteChannel.deposits(1)).toString());
-    //   console.log("Retiro de cuenta 1:", (await spriteChannel.withdrawn(0)).toString());
-    //   console.log("Retiro de cuenta 2:", (await spriteChannel.withdrawn(1)).toString());
 }
 
 main()

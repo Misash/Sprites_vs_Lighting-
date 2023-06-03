@@ -4,30 +4,50 @@ pragma solidity ^0.8.17;
 import "hardhat/console.sol";
 
 contract PreimageManager {
-    mapping(bytes32 => uint256) public timestamp;
+
+    struct Data {
+        bool revealed;
+        uint256 submit_time;
+        uint256 revealed_time;
+    }
+
+    mapping(bytes32 => Data) public preimage;
 
     // block = 15 seconds
     //save the block where the preim0age was revealed
-    function submitPreimage(bytes32 x) external {
-        if (timestamp[keccak256(abi.encode(x))] == 0) {
-            timestamp[keccak256(abi.encode(x))] = block.number;
+    function submitPreimage(bytes32 x) external returns (uint256){
+        require(
+            preimage[keccak256(abi.encode(x))].revealed == false,
+            "Preimage already submiteed"
+        );
 
-            // console.log("-------------------------");
-            // console.log("X: "); console.logBytes32(x);
-            // console.log("H: ");
-            // console.logBytes32(keccak256(abi.encode(x)));
-            // console.log("block Num: ",timestamp[keccak256(abi.encode(x))]);
-            // console.log("-------------------------");
-        }
+        preimage[keccak256(abi.encode(x))] = Data({
+            revealed: false,
+            submit_time: block.number,
+            revealed_time: 0
+        });
+        
+        console.log("Preimage submitted at block: %s", preimage[keccak256(abi.encode(x))].submit_time);
+        return preimage[keccak256(abi.encode(x))].submit_time;
     }
 
-    function getTimestamp(bytes32 x) external view returns (uint256) {
-        return timestamp[keccak256(abi.encode(x))];
+    function revealPreimage(bytes32 x) external returns (uint256) {
+        require(
+            preimage[keccak256(abi.encode(x))].revealed == false,
+            "Preimage already revealed"
+        );
+
+        preimage[keccak256(abi.encode(x))].revealed = true;
+        preimage[keccak256(abi.encode(x))].revealed_time = block.number;
+
+        //return revealed time
+        console.log("Preimage revealed at block: %s", preimage[keccak256(abi.encode(x))].revealed_time);
+        return preimage[keccak256(abi.encode(x))].revealed_time;
     }
 
-    //función permite a un usuario verificar si una preimagen con un hash h se reveló antes del tiempo T
+    // revealed before T
     function revealedBefore(bytes32 h, uint256 T) external view returns (bool) {
-        uint256 t = timestamp[keccak256(abi.encode(h))]; //block number
+        uint256 t = preimage[keccak256(abi.encode(h))].revealed_time; //block number
         return (t > 0 && t <= T);
     }
 }

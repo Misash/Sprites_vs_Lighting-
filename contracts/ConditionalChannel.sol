@@ -4,18 +4,16 @@ pragma solidity ^0.8.17;
 import "hardhat/console.sol";
 
 // External interface
+
 interface PreimageManager {
-    function submitPreimage(bytes32 x) external;
+    function submitPreimage(bytes32 x) external returns (uint256);
 
-    function revealedBefore(bytes32 h, uint T) external view returns (bool);
+    function revealPreimage(bytes32 x) external returns (uint256);
 
-    function getTimestamp(bytes32 x) external view returns (uint256);
+    function revealedBefore(bytes32 h, uint256 T) external view returns (bool);
 }
 
 contract ConditionalChannel {
-    // Blocks for grace period
-    uint constant DELTA = 10;
-
     // Events
     event EventInit();
     event EventUpdate(uint256 r);
@@ -74,7 +72,7 @@ contract ConditionalChannel {
     struct CheckPoint {
         uint256 round;
         bytes32 hash;
-        int256[2] credits;
+        uint256[2] credits;
         uint256 blockNum;
     }
 
@@ -105,6 +103,7 @@ contract ConditionalChannel {
     // Increment on new deposit
     function deposit() external payable onlyplayers {
         playermap[msg.sender].credit += msg.value;
+        console.log("deposit: ", msg.value);
     }
 
     // Increment on withdrawal
@@ -121,18 +120,31 @@ contract ConditionalChannel {
     function update(
         uint256 r,
         bytes32 _hash,
-        int256[2] calldata _credits
+        uint256[2] calldata direction,
+        uint256 amount
     ) external onlyplayers {
         // Only update to states with larger round number
         if (r <= bestRound) return;
 
         //update checkpoint
+        //alice
+        uint256 aliceCredit = playermap[players[direction[0]]].credit - amount;
+        uint256 bobCredit = playermap[players[direction[1]]].credit + amount;
+
         checkPoints[r] = CheckPoint({
             round: uint256(r),
             hash: _hash,
-            credits: _credits,
+            credits: [aliceCredit, bobCredit],
             blockNum: block.number
         });
+
+        //update credits
+        playermap[players[direction[0]]].credit = aliceCredit;
+        playermap[players[direction[1]]].credit = bobCredit;
+
+        console.log("checkpoint: ", r);
+        console.log(checkPoints[r].credits[0]);
+        console.log(checkPoints[r].credits[1]);
 
         status = Status.OK;
         emit EventUpdate(r);
@@ -142,14 +154,12 @@ contract ConditionalChannel {
         require(status == Status.OK, "Invalid status");
         //on-chain
         for (uint256 i = 0; i < 2; i++) {
-            require(
-                playermap[players[i]].credit > 0,
-                "Insufficient funds"
-            );
+            require(playermap[players[i]].credit > 0, "Insufficient funds");
             require(
                 payable(players[i]).send(playermap[players[i]].credit),
                 "Withdrawal failed"
             );
+            console.log("withdrawal: ", playermap[players[i]].credit);
             playermap[players[i]].credit = 0;
         }
     }
