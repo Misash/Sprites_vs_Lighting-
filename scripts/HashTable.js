@@ -116,24 +116,24 @@ class HashTable {
 
 module.exports = HashTable;
 
-// Ejemplo de uso
-const addressTable = new HashTable();
+// // Ejemplo de uso
+// const addressTable = new HashTable();
 
-addressTable.set('O', 'A');
-addressTable.set('O', 'B');
-addressTable.set('A', 'O');
-addressTable.set('A', 'D');
-addressTable.set('A', 'C');
-addressTable.set('B', 'O');
-addressTable.set('B', 'C');
+// addressTable.set('O', 'A');
+// addressTable.set('O', 'B');
+// addressTable.set('A', 'O');
+// addressTable.set('A', 'D');
+// addressTable.set('A', 'C');
+// addressTable.set('B', 'O');
+// addressTable.set('B', 'C');
 
 
-const linkedList1 = addressTable.get('O');
-console.log(linkedList1.search('D')); // true
-console.log(linkedList1.search('A')); // false
+// const linkedList1 = addressTable.get('O');
+// console.log(linkedList1.search('D')); // true
+// console.log(linkedList1.search('A')); // false
 
-addressTable.printTable()
+// addressTable.printTable()
 
-addressTable.remove('O');
+// addressTable.remove('O');
 
-addressTable.printTable()
+// addressTable.printTable()

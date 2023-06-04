@@ -100,6 +100,21 @@ contract ConditionalChannel {
         emit EventInit();
     }
 
+    //getBalance 
+    function getBalance(address player) public view returns (uint256) {
+        return playermap[player].credit;
+    }
+
+    //getAdress from the other party
+    function getAddressRecipient(address player) public view returns (address) {
+        uint256 recipientId = playermap[player].id == 1? 2 : 1; 
+        return players[recipientId - 1];
+    }
+
+    function getIndex(address player) public view returns (uint256) {
+        return playermap[player].id - 1;
+    }
+
     // Increment on new deposit
     function deposit() external payable onlyplayers {
         playermap[msg.sender].credit += msg.value;
