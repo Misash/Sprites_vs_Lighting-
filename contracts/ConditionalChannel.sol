@@ -100,19 +100,23 @@ contract ConditionalChannel {
         emit EventInit();
     }
 
-    //getBalance 
+    //getBalance
     function getBalance(address player) public view returns (uint256) {
         return playermap[player].credit;
     }
 
     //getAdress from the other party
     function getAddressRecipient(address player) public view returns (address) {
-        uint256 recipientId = playermap[player].id == 1? 2 : 1; 
+        uint256 recipientId = playermap[player].id == 1 ? 2 : 1;
         return players[recipientId - 1];
     }
 
     function getIndex(address player) public view returns (uint256) {
         return playermap[player].id - 1;
+    }
+
+    function getRound() public view returns (uint256) {
+        return bestRound;
     }
 
     // Increment on new deposit
@@ -143,23 +147,26 @@ contract ConditionalChannel {
 
         //update checkpoint
         //alice
-        uint256 aliceCredit = playermap[players[direction[0]]].credit - amount;
-        uint256 bobCredit = playermap[players[direction[1]]].credit + amount;
+        // uint256 aliceCredit = playermap[players[direction[0]]].credit - amount;
+        // uint256 bobCredit = playermap[players[direction[1]]].credit + amount;
+
+        playermap[players[direction[0]]].credit -= amount;
+        playermap[players[direction[1]]].credit += amount;
+
+        uint256 senderCredit = playermap[players[direction[0]]].credit;
+        uint256 recipientCredit = playermap[players[direction[1]]].credit;
 
         checkPoints[r] = CheckPoint({
             round: uint256(r),
             hash: _hash,
-            credits: [aliceCredit, bobCredit],
+            credits: [senderCredit, recipientCredit],
             blockNum: block.number
         });
 
-        //update credits
-        playermap[players[direction[0]]].credit = aliceCredit;
-        playermap[players[direction[1]]].credit = bobCredit;
 
         console.log("checkpoint: ", r);
-        console.log(checkPoints[r].credits[0]);
-        console.log(checkPoints[r].credits[1]);
+        console.log(playermap[players[0]].credit);
+        console.log(playermap[players[1]].credit);
 
         status = Status.OK;
         emit EventUpdate(r);

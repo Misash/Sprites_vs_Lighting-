@@ -6,9 +6,11 @@ const HashTable = require('./HashTable.js');
 
 class Channel {
 
-    constructor(_addressChannel, _PM) {
+    constructor(_players,_addressChannel, _PM) {
         this.addressChannel = _addressChannel;
         this.PM = _PM;
+        this.player1 = _players[0];
+        this.player2 = _players[1];
     }
 
     //get total amount of money of the party
@@ -26,20 +28,31 @@ class Channel {
         return this.addressChannel.getIndex(address);
     }
 
+    getLastRound(){
+        return this.addressChannel.getRound();
+    }
+
 
     //make a transaction
-    async makeTransation(senderAdress, recipientAdress, coins) {
-        if (this.getBalance(senderAdress) < coins) {
+    async makeTransaction(sender, recipient, coins) {
+        if (this.getBalance(sender.address) < coins) {
             throw new Error("Not enough money");
         }
 
-        //sender send the preImage signed with the recipient address
-        let Round = this.getBalance(senderAdress) + 1;
-        let amount = ethers.utils.parseEther(coins.toString());
+        //sender send the preImage to the PM
+        let Round = await this.getLastRound() + 1;
+        let amount = ethers.utils.parseEther(coins);
         let hash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("secret"));
-        let indexSender = this.getIndex(senderAdress);
+        let indexSender = await this.getIndex(sender.address);
         let indexRecipient = indexSender == 0 ? 1 : 0;
         let direction = [indexSender, indexRecipient]; // sender -> recipient
+
+        // console.log("Round: ", Round);
+        // console.log("amount: ", amount);
+        // console.log("hash: ", hash);
+        console.log("direction: ", direction);
+        console.log("indexSender: ", indexSender);
+        console.log("indexRecipient: ", indexRecipient);
 
         // Generate the singature
         const messageHash = ethers.utils.solidityKeccak256(
@@ -48,14 +61,14 @@ class Channel {
         );
 
         //sender send the preimage with 
-        let currentBlock = await PM.connect(alice).submitPreimage(messageHash);
+        let currentBlock = await this.PM.connect(sender).submitPreimage(messageHash);
         let deadline = currentBlock.blockNumber + delta;
         console.log("currentBlock: ", currentBlock.blockNumber);
         console.log("deadline: ", deadline);
 
 
-        //recipient has delta time to reveal the preimage
-        await PM.connect(recipientAdress).revealPreimage(messageHash);
+        // //recipient has delta time to reveal the preimage
+        let revealPreimage = await this.PM.connect(recipient).revealPreimage(messageHash);
 
         if (revealPreimage) {
             console.log("Recipient SI revelo el preimage antes del deadline");
@@ -64,7 +77,7 @@ class Channel {
         } else {
             console.log("Recipient No revelo el preimage antes del deadline!!!!");
         }
-
+        
     }
 
     //close the channel
@@ -87,6 +100,7 @@ class Network {
     //nodos
     constructor(_GPM) {
         this.GPM = _GPM;
+        console.log("Network created");
     }
 
 
@@ -94,28 +108,35 @@ class Network {
         this.nodes.remove(adressPlayer);
     }
 
-    async createChannel(player1Address, player2Address, [coins1, coins2]){
+    async createChannel([coins1, coins2]) {
+
+        // get accounts from the contract
+        const players = await ethers.getSigners();
+        const [player1, player2] = players;
 
         // deploy a contract on the network
         const SpriteChannel = await ethers.getContractFactory("ConditionalChannel");
-        const spriteChannel = await SpriteChannel.deploy([player1Address, player2Address]);
+        const spriteChannel = await SpriteChannel.deploy([player1.address, player2.address]);
         await spriteChannel.deployed();
 
         // Make a deposit in the channel for both parties
-        await spriteChannel.connect(player1Address).deposit({ value: coins1 });
-        await spriteChannel.connect(player2Address).deposit({ value: coins2 });
+        await spriteChannel.connect(player1).deposit({ value: ethers.utils.parseEther(coins1) }); //strings
+        await spriteChannel.connect(player2).deposit({ value: ethers.utils.parseEther(coins2) });
 
         //create channel instance
-        const channel = new Channel(spriteChannel, this.GPM);
+        const channel = new Channel(players,spriteChannel, this.GPM);
 
         // add the bidirectional channel to the network
-        this.channels.set(player1Address, spriteChannel);
-        this.channels.set(player2Address, spriteChannel);
+        this.channels.set(player1.address, spriteChannel);
+        this.channels.set(player2.address, spriteChannel);
 
+        console.log("Channel created: ", spriteChannel.address);
+
+        return channel;
     }
 
 
-    
+
 
 }
 
@@ -123,13 +144,6 @@ class Network {
 
 async function main() {
 
-
-
-    
-
-    // Obtener las cuentas del contrato
-    const players = await ethers.getSigners();
-    const [alice, bob] = players;
 
     // Desplegar el contrato PreimageManager
     const PreimageManager = await ethers.getContractFactory("contracts/PreImageManager.sol:PreimageManager");
@@ -139,71 +153,20 @@ async function main() {
 
     // Obtener una instancia existente del contrato PreimageManager
     const preimageManagerAddress = preimageManager.address; // Dirección del contrato PreimageManager existente
-    const PM = await ethers.getContractAt("contracts/ConditionalChannel.sol:PreimageManager", preimageManagerAddress);
+    const Global_PM = await ethers.getContractAt("contracts/ConditionalChannel.sol:PreimageManager", preimageManagerAddress);
 
 
-    // Desplegar el contrato SpriteChannel
-    const SpriteChannel = await ethers.getContractFactory("ConditionalChannel");
-    const spriteChannel = await SpriteChannel.deploy([
-        alice.address,
-        bob.address,
-    ]);
-    await spriteChannel.deployed();
+    net = new Network(Global_PM);
 
 
-    // Hacer un depósito en el canal para ambas partes
-    await spriteChannel.connect(alice).deposit({ value: ethers.utils.parseEther("10") });
-    await spriteChannel.connect(bob).deposit({ value: ethers.utils.parseEther("15") });
+    channel = await net.createChannel( ["10","10"]);
 
+    //Make many transactions
+    await channel.makeTransaction(channel.player2, channel.player1, "5");
+    await channel.makeTransaction(channel.player1, channel.player2, "2");
 
-
-    //Realizar múltiples transacciones entre las partes
-
-    //alice envia el preimage y firma con la direccion de bob
-    let Round = 1;
-    let amount = ethers.utils.parseEther("2");
-    let hash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("secret"));
-    let direction = [0, 1]; // alice -> bob
-    // Generar la firma válida 
-    const messageHash = ethers.utils.solidityKeccak256(
-        ["uint", "bytes32", "int[2]", "uint"],
-        [Round, hash, direction, amount]
-    );
-
-
-
-    //alice envia el preimage
-    let currentBlock = await PM.connect(alice).submitPreimage(messageHash);
-    let deadline = currentBlock.blockNumber + delta;
-    console.log("currentBlock: ", currentBlock.blockNumber);
-    console.log("deadline: ", deadline);
-
-    //bob tiene delta tiempo para revelar el preimage
-
-    for (let i = currentBlock.blockNumber; i < deadline; i++) {
-        if (i == deadline - 1) {
-            //bob revela el preimage
-            await PM.connect(bob).revealPreimage(messageHash);
-        }
-        await network.provider.send("evm_mine");
-    }
-
-    let revealPreimage = await PM.revealedBefore(messageHash, deadline);
-
-    if (revealPreimage) {
-        console.log("Bob SI revelo el preimage antes del deadline");
-        //actualizar el estado del channel
-        await spriteChannel.update(Round, hash, direction, amount);
-    } else {
-        console.log("Bob No revelo el preimage antes del deadline!!!!");
-    }
-
-    //bob envia 5 eth a alice
-
-
-    //alice finaliza el canal
-    await spriteChannel.connect(alice).finalize();
-
+    //close the channel
+    await channel.close();
 
 }
 
