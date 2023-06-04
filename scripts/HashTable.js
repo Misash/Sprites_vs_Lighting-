@@ -53,6 +53,15 @@ class LinkedList {
             current = current.next;
         }
     }
+
+
+    *[Symbol.iterator]() {
+        let current = this.head;
+        while (current !== null) {
+          yield current.data;
+          current = current.next;
+        }
+      }
 }
 
 class HashTable {
@@ -116,11 +125,50 @@ class HashTable {
 
 module.exports = HashTable;
 
-// // Ejemplo de uso
-// const addressTable = new HashTable();
+// Ejemplo de uso
+const addressTable = new HashTable();
 
-// addressTable.set('O', 'A');
-// addressTable.set('O', 'B');
+
+class Players{
+    constructor(_name, x) {
+        this.address = _name;
+        this.x = x;
+    }
+
+}
+
+class channel{
+    players = [];
+    constructor(_players) {
+        this.players[0] = _players[0];
+        this.players[1] = _players[1];
+        this.next = null;
+    }
+
+    getBalance(address){
+        return 10;
+    }
+
+    getAddressRecipient(address) {
+        return address === this.players[0].address ? this.players[1].address : this.players[0].address;
+    }
+
+    // getIndex(address){
+    //     return this.player.indexOf(address);
+    // }
+}
+
+A = new Players("0x1",5);
+B = new Players("0x2",10);
+C = new Players("0x3",15);
+
+c1 = new channel([A,B]);
+c2 = new channel([A,C]);
+
+addressTable.set(A.address, c1);
+addressTable.set(A.address, c2);
+addressTable.set(B.address, c1);
+addressTable.set(C.address, c2);
 // addressTable.set('A', 'O');
 // addressTable.set('A', 'D');
 // addressTable.set('A', 'C');
@@ -128,8 +176,13 @@ module.exports = HashTable;
 // addressTable.set('B', 'C');
 
 
-// const linkedList1 = addressTable.get('O');
-// console.log(linkedList1.search('D')); // true
+// const linkedList1 = addressTable.get(A);
+// console.log(linkedList1); // true
+
+for (const ch of addressTable.get(A.address)){
+    console.log(ch.getAddressRecipient(A.address))
+    
+}
 // console.log(linkedList1.search('A')); // false
 
 // addressTable.printTable()

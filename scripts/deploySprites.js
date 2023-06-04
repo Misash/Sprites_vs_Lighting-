@@ -80,6 +80,7 @@ class Channel {
         
     }
 
+
     //close the channel
     async close() {
         await this.addressChannel.finalize();
@@ -93,6 +94,7 @@ class Network {
 
     //channels adress -> channel
     channels = new HashTable();
+
 
     //Global PreimageManager
     GPM = null;
@@ -130,10 +132,57 @@ class Network {
         this.channels.set(player1.address, spriteChannel);
         this.channels.set(player2.address, spriteChannel);
 
+
         console.log("Channel created: ", spriteChannel.address);
 
         return channel;
     }
+
+
+    findShortestPathWithCapacity(start, target, requiredCapacity) {
+
+        //BFS
+        const capacities = {};
+        const previous = {};
+        const queue = [];
+        queue.push(start);
+        capacities[start] = Infinity;
+    
+        while (queue.length > 0) {
+
+            //save and delete the first element of the queue
+            const vertex = queue.shift(); 
+    
+            if (vertex === target && capacities[vertex] >= requiredCapacity) {
+                // plath found
+                const path = [];
+                let current = target;
+                while (current !== start) {
+                    path.unshift(current);
+                    current = previous[current];
+                }
+                path.unshift(start);
+                return path;
+            }
+    
+            for (const ch of this.channels.get(vertex)){
+                //get the neighbor
+                const recipient = ch.getAddressRecipient(vertex);
+                //how much money can be sent
+                const newCapacity = Math.min(capacities[vertex], ch.getBalance(vertex));
+                //if the neighbor has more capacity than the current one or not exists
+                if (!capacities[recipient] || newCapacity > capacities[recipient]) {
+                    capacities[recipient] = newCapacity;
+                    previous[recipient] = vertex;
+                    queue.push(recipient);
+                }
+            }
+        }
+    
+        // No se encontró un camino con suficiente capacidad
+        return [];
+    }
+
 
 
 
@@ -149,8 +198,7 @@ async function main() {
     const PreimageManager = await ethers.getContractFactory("contracts/PreImageManager.sol:PreimageManager");
     const preimageManager = await PreimageManager.deploy();
     await preimageManager.deployed();
-
-
+    
     // Obtener una instancia existente del contrato PreimageManager
     const preimageManagerAddress = preimageManager.address; // Dirección del contrato PreimageManager existente
     const Global_PM = await ethers.getContractAt("contracts/ConditionalChannel.sol:PreimageManager", preimageManagerAddress);
