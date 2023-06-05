@@ -6,7 +6,7 @@ const HashTable = require('./HashTable.js');
 
 class Channel {
 
-    constructor(_players,_addressChannel, _PM) {
+    constructor(_players, _addressChannel, _PM) {
         this.addressChannel = _addressChannel;
         this.PM = _PM;
         this.player1 = _players[0];
@@ -28,7 +28,7 @@ class Channel {
         return this.addressChannel.getIndex(address);
     }
 
-    getLastRound(){
+    getLastRound() {
         return this.addressChannel.getRound();
     }
 
@@ -77,7 +77,7 @@ class Channel {
         } else {
             console.log("Recipient No revelo el preimage antes del deadline!!!!");
         }
-        
+
     }
 
 
@@ -126,7 +126,7 @@ class Network {
         await spriteChannel.connect(player2).deposit({ value: ethers.utils.parseEther(coins2) });
 
         //create channel instance
-        const channel = new Channel(players,spriteChannel, this.GPM);
+        const channel = new Channel(players, spriteChannel, this.GPM);
 
         // add the bidirectional channel to the network
         this.channels.set(player1.address, spriteChannel);
@@ -147,25 +147,25 @@ class Network {
         const queue = [];
         queue.push(start);
         capacities[start] = Infinity;
-    
+
         while (queue.length > 0) {
 
             //save and delete the first element of the queue
-            const vertex = queue.shift(); 
-    
+            const vertex = queue.shift();
+
             if (vertex === target && capacities[vertex] >= requiredCapacity) {
                 // plath found
                 const path = [];
-                let current = target;
-                while (current !== start) {
+                let current = previous[target];
+                while (current.sender !== start) {
                     path.unshift(current);
-                    current = previous[current];
+                    current = previous[current.sender];
                 }
-                path.unshift(start);
+                path.unshift( current);
                 return path;
             }
-    
-            for (const ch of this.channels.get(vertex)){
+
+            for (const ch of this.channels.get(vertex)) {
                 //get the neighbor
                 const recipient = ch.getAddressRecipient(vertex);
                 //how much money can be sent
@@ -173,18 +173,16 @@ class Network {
                 //if the neighbor has more capacity than the current one or not exists
                 if (!capacities[recipient] || newCapacity > capacities[recipient]) {
                     capacities[recipient] = newCapacity;
-                    previous[recipient] = vertex;
+                    chunk = { sender: vertex, recipient: recipient, amount: requiredCapacity, channel: ch };
+                    previous[recipient] = chunk;
                     queue.push(recipient);
                 }
             }
         }
-    
+
         // No se encontró un camino con suficiente capacidad
         return [];
     }
-
-
-
 
 
 }
@@ -198,7 +196,7 @@ async function main() {
     const PreimageManager = await ethers.getContractFactory("contracts/PreImageManager.sol:PreimageManager");
     const preimageManager = await PreimageManager.deploy();
     await preimageManager.deployed();
-    
+
     // Obtener una instancia existente del contrato PreimageManager
     const preimageManagerAddress = preimageManager.address; // Dirección del contrato PreimageManager existente
     const Global_PM = await ethers.getContractAt("contracts/ConditionalChannel.sol:PreimageManager", preimageManagerAddress);
@@ -207,7 +205,7 @@ async function main() {
     net = new Network(Global_PM);
 
 
-    channel = await net.createChannel( ["10","10"]);
+    channel = await net.createChannel(["10", "10"]);
 
     //Make many transactions
     await channel.makeTransaction(channel.player2, channel.player1, "5");

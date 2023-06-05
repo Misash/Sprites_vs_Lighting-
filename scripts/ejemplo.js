@@ -40,12 +40,13 @@ function findShortestPathWithCapacity(start, target, requiredCapacity) {
         if (vertex === target && capacities[vertex] >= requiredCapacity) {
             // Se encontró el camino con suficiente capacidad
             const path = [];
-            let current = target;
-            while (current !== start) {
+            let current = previous[target];
+            while (current.sender !== start) {
+                console.log("entro al while");
                 path.unshift(current);
-                current = previous[current];
+                current = previous[current.sender];
             }
-            path.unshift(start);
+            path.unshift(current);
             return path;
         }
 
@@ -54,7 +55,8 @@ function findShortestPathWithCapacity(start, target, requiredCapacity) {
             const newCapacity = Math.min(capacities[vertex], neighbor.capacity);
             if (!capacities[name] || newCapacity > capacities[name]) {
                 capacities[name] = newCapacity;
-                previous[name] = vertex;
+                chunk = {sender: vertex, recipient: name, amount: requiredCapacity};
+                previous[name] = chunk;
                 queue.push(name);
             }
         }
@@ -68,7 +70,7 @@ function findShortestPathWithCapacity(start, target, requiredCapacity) {
 graph["alice"] = [
     { name: "bob", capacity: 5 },
     { name: "carol", capacity: 3 },
-    { name: "darian", capacity: 10 },
+    { name: "darian", capacity: 1 },
 ];
 graph["bob"] = [
     { name: "alice", capacity: 7 },
@@ -92,7 +94,7 @@ const requiredCapacity = 3;
 const shortestPath = findShortestPathWithCapacity(startUser, targetUser, requiredCapacity);
 
 if (shortestPath.length > 0) {
-    console.log("Camino encontrado:", shortestPath.join(" "));
+    console.log("Camino encontrado:", shortestPath);
 } else {
     console.log("No se encontró un camino con suficiente capacidad.");
 }
