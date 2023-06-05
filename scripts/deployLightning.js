@@ -70,11 +70,23 @@ class Channel {
             [Round, hash, direction, amount]
         );
 
-        //sender send the preimage with 
-        let currentBlock = await this.PM.connect(sender).submitPreimage(messageHash);
-        let deadline = currentBlock.blockNumber + delta;
-        console.log("currentBlock: ", currentBlock.blockNumber);
+        let currentBlock = await ethers.provider.getBlockNumber();
+        let deadline = currentBlock + delta;
+        console.log("currentBlock: ", currentBlock);
         console.log("deadline: ", deadline);
+
+
+        for (let i = currentBlock; i < deadline; i++) {
+            //petty attack -> delta time to reveal the preimage
+            if (i == deadline - 1) {
+                //sender send the preimage with 
+                let currentBlock = await this.PM.connect(sender).submitPreimage(messageHash);
+                let deadline = currentBlock.blockNumber + delta;
+                console.log("currentBlock: ", currentBlock.blockNumber);
+                console.log("deadline: ", deadline);
+            }
+            await network.provider.send("evm_mine");
+        }
 
 
         // //recipient has delta time to reveal the preimage
@@ -129,23 +141,24 @@ class Network {
         console.log("player2: ", player2.address);
 
         // deploy a contract on the network
-        const SpriteChannel = await ethers.getContractFactory("ConditionalChannel");
-        const spriteChannel = await SpriteChannel.deploy([player1.address, player2.address]);
-        await spriteChannel.deployed();
+        const ConditionalChannel = await ethers.getContractFactory("ConditionalChannel");
+        const conditionalChannel = await ConditionalChannel.deploy([player1.address, player2.address]);
+        await conditionalChannel.deployed();
 
         // Make a deposit in the channel for both parties
-        await spriteChannel.connect(player1).deposit({ value: ethers.utils.parseEther(coins1) }); //strings
-        await spriteChannel.connect(player2).deposit({ value: ethers.utils.parseEther(coins2) });
+        await conditionalChannel.connect(player1).deposit({ value: ethers.utils.parseEther(coins1) }); //strings
+        await conditionalChannel.connect(player2).deposit({ value: ethers.utils.parseEther(coins2) });
 
-        //create channel instance
-        const channel = new Channel(players, spriteChannel, this.GPM);
+        //create a lightning channel with Local PreimageManager
+        const channel = new Channel(players, conditionalChannel, await this.getPM());
+
 
         // add the bidirectional channel to the network
         this.channels.set(player1.address, channel);
         this.channels.set(player2.address, channel);
 
 
-        console.log("Channel created: ", spriteChannel.address);
+        console.log("Channel created: ", conditionalChannel.address);
         return channel;
     }
 
@@ -206,6 +219,17 @@ class Network {
         }
 
         return accounts;
+    }
+
+
+    async getPM() {
+        const PreimageManager = await ethers.getContractFactory("contracts/PreImageManager.sol:PreimageManager");
+        const preimageManager = await PreimageManager.deploy();
+        await preimageManager.deployed();
+
+        const preimageManagerAddress = preimageManager.address;
+        const PM = await ethers.getContractAt("contracts/ConditionalChannel.sol:PreimageManager", preimageManagerAddress);
+        return PM;
     }
 
 
@@ -293,35 +317,23 @@ async function main() {
     //Make many transactions
 
 
-    let currentBlock = await ethers.provider.getBlockNumber();
-    let deadline = currentBlock + delta;
-    console.log("currentBlock: ", currentBlock);
-    console.log("deadline: ", deadline);
-
-
     // startime
     const startTime = performance.now();
 
-    for (let i = currentBlock; i < deadline; i++) {
-        //petty attack -> delta time to reveal the preimage
-        if (i == deadline - 1) {
-            for (let chunk of path) {
-                await chunk.channel.makeTransaction(chunk.sender, chunk.recipient, chunk.amount.toString());
-            }
-        }
-        await network.provider.send("evm_mine");
-    }
 
+    for (let chunk of path) {
+        await chunk.channel.makeTransaction(chunk.sender, chunk.recipient, chunk.amount.toString());
+    }
 
     const endTime = performance.now();
 
-    
+
     const elapsedTime = endTime - startTime;
 
     console.log(`Tiempo transcurrido: ${elapsedTime} ms`);
 
 
-    
+
 
 
     //close the channel
