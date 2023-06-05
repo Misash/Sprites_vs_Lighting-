@@ -30,7 +30,7 @@ contract ConditionalChannel {
         _;
     }
     modifier onlyplayers() {
-        require(playermap[msg.sender].id > 0, "Unauthorized");
+        require(playermap[msg.sender].id > 0, "Unauthorized player");
         _;
     }
 
