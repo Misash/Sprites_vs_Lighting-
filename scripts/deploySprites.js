@@ -1,7 +1,8 @@
 const { ethers } = require("hardhat");
 const delta = 10; // Número de bloques para que expire el hash
 const HashTable = require('./HashTable.js');
-
+const fs = require('fs');
+const { send } = require("process");
 
 
 class Channel {
@@ -212,6 +213,108 @@ class Network {
 }
 
 
+async function getPlayers(numPlayers) {
+    const provider = new ethers.providers.JsonRpcProvider();
+    const players = [];
+
+    //get default accounts
+    const defaultPlayers = await ethers.getSigners();
+    players.push(...defaultPlayers);
+
+    // Create additional accounts if more than the default accounts are needed
+    const remainingPlayers = numPlayers - players.length;
+    for (let i = 0; i < remainingPlayers; i++) {
+        const wallet = ethers.Wallet.createRandom();
+        const signer = wallet.connect(provider);
+
+        // Transferir ether a la cuenta generada
+        const sender = defaultPlayers[0]; // Utiliza una cuenta con fondos suficientes para enviar el ether
+        const value = ethers.utils.parseEther("1"); // Cantidad de ether a transferir
+        await sender.sendTransaction({
+            to: signer.address,
+            value: value
+        });
+
+        players.push(signer);
+    }
+
+    return players;
+}
+
+
+//   async function getPlayers(numPlayers) {
+//     const provider = new ethers.providers.JsonRpcProvider(); // Asegúrate de configurar la URL del proveedor JSON-RPC según tu entorno
+//     const players = await ethers.getSigners();
+
+//     // Crear cuentas adicionales si se necesita más de las cuentas predeterminadas
+//     const remainingPlayers = numPlayers - players.length;
+//     if (remainingPlayers <= 0) {
+//       return players;
+//     }
+
+//     // Transferir ether a las cuentas generadas
+//     const sender = players[0]; // Utiliza una cuenta con fondos suficientes para enviar el ether
+//     const value = ethers.utils.parseEther("1"); // Cantidad de ether a transferir
+//     const createRandomPromises = [];
+
+//     for (let i = 0; i < remainingPlayers; i++) {
+//       createRandomPromises.push(ethers.Wallet.createRandom());
+//     }
+
+//     const randomWallets = await Promise.all(createRandomPromises);
+//     const transferPromises = randomWallets.map(wallet => {
+//       const signer = wallet.connect(provider);
+//       players.push(signer);
+//       return sender.sendTransaction({
+//         to: signer.address,
+//         value: value
+//       });
+//     });
+
+//     await Promise.all(transferPromises);
+
+//     return players;
+//   }
+
+
+// async function getPlayers(numPlayers) {
+//     const provider = new ethers.providers.JsonRpcProvider(); // Asegúrate de configurar la URL del proveedor JSON-RPC según tu entorno
+//     const players = await ethers.getSigners();
+
+//     let sender = players[0]; // Selección inicial de la primera cuenta disponible
+
+//     // Verificar si la cuenta seleccionada tiene suficientes fondos
+//     const balance = await sender.getBalance();
+//     const value = ethers.utils.parseEther("1"); // Cantidad de ETH a transferir
+
+//     if (balance.lt(value)) {
+//       // Buscar una cuenta con suficientes fondos para realizar las transferencias
+//       for (let i = 1; i < players.length; i++) {
+//         sender = players[i];
+//         const balance = await sender.getBalance();
+//         if (balance.gte(value)) {
+//           break;
+//         }
+//       }
+//     }
+
+//     // Crear cuentas adicionales si se necesita más de 20
+//     const remainingPlayers = numPlayers - players.length;
+//     for (let i = 0; i < remainingPlayers; i++) {
+//       const wallet = ethers.Wallet.createRandom();
+//       const signer = wallet.connect(provider);
+//       players.push(signer);
+
+//       // Transferir ETH a la cuenta generada desde la cuenta seleccionada
+//       await sender.sendTransaction({
+//         to: signer.address,
+//         value: value,
+//       });
+//     }
+
+//     return players;
+//   }
+
 
 
 async function main() {
@@ -229,57 +332,47 @@ async function main() {
 
     net = new Network(Global_PM);
 
+
     //get accounts
+    let numPlayers = 22;
     const players = await ethers.getSigners();
-
-    console.log("players: ", players.length);
-
-    //create channels
-    let channels = [];
-    // channels[0] = await net.createChannel([players[0], players[1]], ["5", "7"]); //a-b
-    // channels[1] = await net.createChannel([players[0], players[2]], ["3", "4"]); //a-c
-    // channels[2] = await net.createChannel([players[0], players[3]], ["1", "2"]);  //a-d
-
-    // channels[3] = await net.createChannel([players[1], players[2]], ["10", "6"]);  //a -c
-    // channels[4] = await net.createChannel([players[2], players[3]], ["8", "6"]);  //c -d
-
-    channels[0] = await net.createChannel([players[0], players[1]], ["5", "7"]); // a-b
-    channels[1] = await net.createChannel([players[0], players[2]], ["3", "4"]); // a-c
-    channels[2] = await net.createChannel([players[0], players[3]], ["1", "2"]); // a-d
-    channels[3] = await net.createChannel([players[1], players[2]], ["10", "6"]); // b-c
-    channels[4] = await net.createChannel([players[1], players[3]], ["8", "6"]); // b-d
-    channels[5] = await net.createChannel([players[2], players[3]], ["9", "11"]); // c-d
-    channels[6] = await net.createChannel([players[1], players[4]], ["5", "3"]); // b-e
-    channels[7] = await net.createChannel([players[2], players[4]], ["7", "2"]); // c-e
-    channels[8] = await net.createChannel([players[3], players[4]], ["4", "9"]); // d-e
-    channels[9] = await net.createChannel([players[3], players[5]], ["6", "5"]); // d-f
-    channels[10] = await net.createChannel([players[4], players[5]], ["8", "10"]); // e-f
-    channels[11] = await net.createChannel([players[4], players[6]], ["3", "7"]); // e-g
-    channels[12] = await net.createChannel([players[5], players[6]], ["4", "6"]); // f-g
-    channels[13] = await net.createChannel([players[4], players[7]], ["9", "8"]); // e-h
-    channels[14] = await net.createChannel([players[5], players[7]], ["11", "6"]); // f-h
-    channels[15] = await net.createChannel([players[6], players[7]], ["7", "10"]); // g-h
-    channels[16] = await net.createChannel([players[6], players[8]], ["4", "5"]); // g-i
-    channels[17] = await net.createChannel([players[7], players[8]], ["6", "7"]); // h-i
-    channels[18] = await net.createChannel([players[7], players[9]], ["8", "9"]); // h-j
-    channels[19] = await net.createChannel([players[8], players[9]], ["5", "11"]); // i-j
+  
+    console.log("Generated accounts:");
+    console.log(players.length);
 
 
-    for (let i = 0; i < channels.length; i++) {
-        console.log("channel: ", i);
-        console.log("player1: ", channels[i].player1.address);
-        console.log("player2: ", channels[i].player2.address);
-        console.log("addressChannel: ", channels[i].addressChannel.address);
+    for (const player of players) {
+        const balance = await player.getBalance();
+        // console.log(`Player: ${player.address}`);
+        console.log(`Balance: ${ethers.utils.formatEther(balance)}`); // Convert balance from wei to ether
     }
 
 
+    //read DatSet
+    const readData = fs.readFileSync('./Datasets/SmallWorld.json', 'utf8');
+    const dataset = JSON.parse(readData);
+
+    console.log("channels: ", dataset.length);
+
+
+    //create channels
+    let channels = [];
+    for( data of dataset){
+        console.log("channel: ", data);
+        sender = players[data.players[0]];
+        recipient = players[data.players[1]];
+        channels.push( await net.createChannel([sender, recipient], data.weights)); 
+    }
+
+
+
+    //print the channels
     net.channels.printTable();
 
 
+    //Find path to make a transaction with linked Channels
     let toSend = 5;
-    //some user want to make a transaction in linkedChannels
-    let path = await net.findShortestPathWithCapacity(players[0].address, players[8].address, toSend);
-
+    let path = await net.findShortestPathWithCapacity(players[2].address, players[38].address, toSend);
     if (path.length > 0) {
         console.log("Camino encontrado:");
         for (const chunk of path) {
@@ -290,18 +383,18 @@ async function main() {
     }
 
 
-    //Make many transactions
 
-
+    // //get current info of the blokchain
     let currentBlock = await ethers.provider.getBlockNumber();
     let deadline = currentBlock + delta;
     console.log("currentBlock: ", currentBlock);
     console.log("deadline: ", deadline);
 
 
-    // startime
+
     const startTime = performance.now();
 
+    //make the transactions
     for (let i = currentBlock; i < deadline; i++) {
         //petty attack -> delta time to reveal the preimage
         if (i == deadline - 1) {
@@ -311,17 +404,12 @@ async function main() {
         }
         await network.provider.send("evm_mine");
     }
-
+    //end transactions
 
     const endTime = performance.now();
-
-    
     const elapsedTime = endTime - startTime;
-
     console.log(`Tiempo transcurrido: ${elapsedTime} ms`);
 
-
-    
 
 
     //close the channel

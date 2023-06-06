@@ -4,9 +4,12 @@ require("@nomicfoundation/hardhat-toolbox");
 module.exports = {
   solidity: "0.8.17",
   networks: {
-    localhost: {
-      url: "http://localhost:8545", // Modify the port if necessary
+    hardhat: {
+      accounts: {
+        mnemonic: "test test test test test test test test test test test junk",
+        count: 100, // Asegúrate de que count sea 50
+      },
     },
   },
-};
 
+};
