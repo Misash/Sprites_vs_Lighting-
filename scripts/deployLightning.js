@@ -22,11 +22,11 @@ async function main() {
 
     //create channels
     let channels = [];
-    for( data of dataset){
+    for (data of dataset) {
         console.log("channel: ", data);
         sender = players[data.players[0]];
         recipient = players[data.players[1]];
-        channels.push( await lightningNet.createChannel([sender, recipient], data.weights)); 
+        channels.push(await lightningNet.createChannel([sender, recipient], data.weights));
     }
 
 
@@ -46,16 +46,16 @@ async function main() {
     }
 
     //petty attack
-    petty_rate = 0.2;
-    malicious = Math.round(path.length*petty_rate);
+    petty_rate = 0.9;
+    malicious = Math.round(path.length * petty_rate);
     no_malicious = path.length - malicious;
 
 
 
     const startTime = performance.now();
 
-     //make the transactions O(1)
-     for (let i = 0; i < no_malicious; i++) {
+    //make the transactions O(1)
+    for (let i = 0; i < no_malicious; i++) {
         chunk = path[i];
         await chunk.channel.makeTransaction(chunk.sender, chunk.recipient, chunk.amount.toString(), false);
     }
@@ -63,7 +63,7 @@ async function main() {
     //petty attack -> delta time to reveal the preimage O(l*delta)
     for (let i = no_malicious; i < path.length; i++) {
         chunk = path[i];
-        await chunk.channel.makeTransaction(chunk.sender, chunk.recipient, chunk.amount.toString(),true);
+        await chunk.channel.makeTransaction(chunk.sender, chunk.recipient, chunk.amount.toString(), true);
     }
 
     const endTime = performance.now();

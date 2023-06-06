@@ -17,6 +17,7 @@ class SpriteNetwork {
         console.log("Network created");
     }
 
+    
 
     removeNode(adressPlayer) {
         this.nodes.remove(adressPlayer);
