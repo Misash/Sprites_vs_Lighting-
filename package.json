@@ -5,6 +5,8 @@
   },
   "dependencies": {
     "@nomiclabs/hardhat-ethers": "^2.2.3",
-    "graphviz": "^0.0.9"
+    "graphviz": "^0.0.9",
+    "jsdom": "^22.1.0",
+    "vis": "^4.21.0-EOL"
   }
 }

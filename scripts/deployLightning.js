@@ -1,10 +1,14 @@
 const { ethers } = require("hardhat");
-const delta = 10; // Número de bloques para que expire el hash
-const HashTable = require('./HashTable.js');
+const fs = require('fs');
+
+const HashTable = require('./utils/HashTable.js');
+
+const delta  = require("./constants.js") // On-chain time mining delay
 
 
 
-class Channel {
+
+class LightningChannelContainer {
 
     constructor(_players, _addressChannel, _PM) {
         this.addressChannel = _addressChannel;
@@ -113,18 +117,14 @@ class Channel {
 }
 
 
-class Network {
+class LightningNetwork {
 
     //channels adress -> channel
     channels = new HashTable();
 
 
-    //Global PreimageManager
-    GPM = null;
-
     //nodos
-    constructor(_GPM) {
-        this.GPM = _GPM;
+    constructor() {
         console.log("Network created");
     }
 
@@ -150,7 +150,7 @@ class Network {
         await conditionalChannel.connect(player2).deposit({ value: ethers.utils.parseEther(coins2) });
 
         //create a lightning channel with Local PreimageManager
-        const channel = new Channel(players, conditionalChannel, await this.getPM());
+        const channel = new LightningChannelContainer(players, conditionalChannel, await this.getPM());
 
 
         // add the bidirectional channel to the network
@@ -202,10 +202,9 @@ class Network {
                     queue.push(recipient);
                 }
             }
-            // console.log("queue: ", queue);
+         
         }
 
-        // No se encontró un camino con suficiente capacidad
         return [];
     }
 
@@ -240,73 +239,39 @@ class Network {
 
 
 
-
 async function main() {
 
 
-    // Desplegar el contrato PreimageManager
-    const PreimageManager = await ethers.getContractFactory("contracts/PreImageManager.sol:PreimageManager");
-    const preimageManager = await PreimageManager.deploy();
-    await preimageManager.deployed();
-
-    // Obtener una instancia existente del contrato PreimageManager
-    const preimageManagerAddress = preimageManager.address; // Dirección del contrato PreimageManager existente
-    const Global_PM = await ethers.getContractAt("contracts/ConditionalChannel.sol:PreimageManager", preimageManagerAddress);
-
-
-    net = new Network(Global_PM);
+    lightningNet = new LightningNetwork();
 
     //get accounts
     const players = await ethers.getSigners();
+    console.log("Generated accounts:");
+    console.log(players.length);
 
-    console.log("players: ", players.length);
+
+    //read DataSet
+    const readData = fs.readFileSync('./Datasets/LinkedNet.json', 'utf8');
+    const dataset = JSON.parse(readData);
+
+    console.log("channels: ", dataset.length);
 
     //create channels
     let channels = [];
-    // channels[0] = await net.createChannel([players[0], players[1]], ["5", "7"]); //a-b
-    // channels[1] = await net.createChannel([players[0], players[2]], ["3", "4"]); //a-c
-    // channels[2] = await net.createChannel([players[0], players[3]], ["1", "2"]);  //a-d
-
-    // channels[3] = await net.createChannel([players[1], players[2]], ["10", "6"]);  //a -c
-    // channels[4] = await net.createChannel([players[2], players[3]], ["8", "6"]);  //c -d
-
-    channels[0] = await net.createChannel([players[0], players[1]], ["5", "7"]); // a-b
-    channels[1] = await net.createChannel([players[0], players[2]], ["3", "4"]); // a-c
-    channels[2] = await net.createChannel([players[0], players[3]], ["1", "2"]); // a-d
-    channels[3] = await net.createChannel([players[1], players[2]], ["10", "6"]); // b-c
-    channels[4] = await net.createChannel([players[1], players[3]], ["8", "6"]); // b-d
-    channels[5] = await net.createChannel([players[2], players[3]], ["9", "11"]); // c-d
-    channels[6] = await net.createChannel([players[1], players[4]], ["5", "3"]); // b-e
-    channels[7] = await net.createChannel([players[2], players[4]], ["7", "2"]); // c-e
-    channels[8] = await net.createChannel([players[3], players[4]], ["4", "9"]); // d-e
-    channels[9] = await net.createChannel([players[3], players[5]], ["6", "5"]); // d-f
-    channels[10] = await net.createChannel([players[4], players[5]], ["8", "10"]); // e-f
-    channels[11] = await net.createChannel([players[4], players[6]], ["3", "7"]); // e-g
-    channels[12] = await net.createChannel([players[5], players[6]], ["4", "6"]); // f-g
-    channels[13] = await net.createChannel([players[4], players[7]], ["9", "8"]); // e-h
-    channels[14] = await net.createChannel([players[5], players[7]], ["11", "6"]); // f-h
-    channels[15] = await net.createChannel([players[6], players[7]], ["7", "10"]); // g-h
-    channels[16] = await net.createChannel([players[6], players[8]], ["4", "5"]); // g-i
-    channels[17] = await net.createChannel([players[7], players[8]], ["6", "7"]); // h-i
-    channels[18] = await net.createChannel([players[7], players[9]], ["8", "9"]); // h-j
-    channels[19] = await net.createChannel([players[8], players[9]], ["5", "11"]); // i-j
-
-
-    for (let i = 0; i < channels.length; i++) {
-        console.log("channel: ", i);
-        console.log("player1: ", channels[i].player1.address);
-        console.log("player2: ", channels[i].player2.address);
-        console.log("addressChannel: ", channels[i].addressChannel.address);
+    for( data of dataset){
+        console.log("channel: ", data);
+        sender = players[data.players[0]];
+        recipient = players[data.players[1]];
+        channels.push( await lightningNet.createChannel([sender, recipient], data.weights)); 
     }
 
 
-    net.channels.printTable();
+    lightningNet.channels.printTable();
 
-
+    //Find path to make a transaction with linked Channels
     let toSend = 5;
     //some user want to make a transaction in linkedChannels
-    let path = await net.findShortestPathWithCapacity(players[0].address, players[8].address, toSend);
-
+    let path = await lightningNet.findShortestPathWithCapacity(players[0].address, players[49].address, toSend);
     if (path.length > 0) {
         console.log("Camino encontrado:");
         for (const chunk of path) {
@@ -317,25 +282,17 @@ async function main() {
     }
 
 
-    //Make many transactions
 
-
-    // startime
     const startTime = performance.now();
 
-
+    //Make many transactions
     for (let chunk of path) {
         await chunk.channel.makeTransaction(chunk.sender, chunk.recipient, chunk.amount.toString());
     }
 
     const endTime = performance.now();
-
-
     const elapsedTime = endTime - startTime;
-
     console.log(`Tiempo transcurrido: ${elapsedTime} ms`);
-
-
 
 
 
