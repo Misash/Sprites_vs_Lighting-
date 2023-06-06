@@ -6,6 +6,6 @@ Try running some of the following tasks:
 ```shell
 npm install
 npx hardhat node
-npx hardhat run scripts/deploySprite.js
+npx hardhat run scripts/deploySprites.js
 npx hardhat run scripts/deployLightning.js
 ```

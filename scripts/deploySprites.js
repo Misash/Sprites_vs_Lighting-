@@ -79,14 +79,24 @@ async function main() {
     console.log("deadline: ", deadline);
 
 
-
+    //petty attack
+    petty_rate = 0.9;
+    malicious = Math.round(path.length*petty_rate);
+    no_malicious = path.length - malicious;
+  
     const startTime = performance.now();
 
-    //make the transactions
+    //make the transactions O(1)
+    for (let i = 0; i < no_malicious; i++) {
+        chunk = path[i];
+        await chunk.channel.makeTransaction(chunk.sender, chunk.recipient, chunk.amount.toString());
+    }
+
+    //petty attack -> delta time to reveal the preimage
     for (let i = currentBlock; i < deadline; i++) {
-        //petty attack -> delta time to reveal the preimage
         if (i == deadline - 1) {
-            for (let chunk of path) {
+            for (let i = no_malicious; i < path.length; i++) {
+                chunk = path[i];
                 await chunk.channel.makeTransaction(chunk.sender, chunk.recipient, chunk.amount.toString());
             }
         }
