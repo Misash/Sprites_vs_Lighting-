@@ -1,5 +1,5 @@
 
-const DELTA = 1000
+const DELTA = 1
 
 
 module.exports = DELTA 
