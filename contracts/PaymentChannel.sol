@@ -3,8 +3,7 @@ pragma solidity ^0.8.17;
 
 import "hardhat/console.sol";
 
-// no concurrent payments
-// payment channel off-chain
+
 
 contract PaymentChannel {
     // Blocks for grace period to finalize the channel

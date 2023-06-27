@@ -7,18 +7,18 @@ const GenLinkedChannels = require('./utils/GenLinkedNet.js');
 const delta = require("./constants.js");
 
 async function main() {
+
     // Get accounts
-    const players = await ethers.getSigners();
+    let players = await ethers.getSigners();
     console.log("Generated accounts:");
     console.log(players.length);
 
     // Read DataSet
-
-    const readData = fs.readFileSync('./Datasets/LinkedNet.json', 'utf8');
+    const readData = fs.readFileSync('./Datasets/network.json', 'utf8');
     const dataset = JSON.parse(readData);
-    let totalPlayers = 50;
-    console.log("channels: ", dataset.length);
-
+    let totalPlayers = 4;
+    console.log("channels: ", dataset);
+    console.log("channels Size: ", dataset.length);
 
     // Get Global PreimageManager
     const PreimageManager = await ethers.getContractFactory("contracts/PreImageManager.sol:PreimageManager");
@@ -27,55 +27,119 @@ async function main() {
     const preimageManagerAddress = preimageManager.address;
     const Global_PM = await ethers.getContractAt("contracts/ConditionalChannel.sol:PreimageManager", preimageManagerAddress);
 
+    //redistribuite accounts
+    GPMAccount = players[0];// create GPM account
+    anonPlayer = players[totalPlayers + 2];// create GPM account
+    players = players.slice(1, totalPlayers + 1);
+
+
+
     // Create SpriteNetwork and LightningNetwork
-    const spriteNet = new SpriteNetwork(Global_PM);
-    const lightningNet = new LightningNetwork();
+    const spriteNet = new SpriteNetwork(Global_PM, GPMAccount);
 
     // Create channels
-    let channels = [];
     for (const data of dataset) {
         console.log("channel: ", data);
         const sender = players[data.players[0]];
         const recipient = players[data.players[1]];
-        channels.push(await spriteNet.createChannel([sender, recipient], data.weights));
-        channels.push(await lightningNet.createChannel([sender, recipient], data.weights));
+        await spriteNet.createChannel([sender, recipient], data.weights);
     }
 
     // Print the channels
     spriteNet.channels.printTable();
-    lightningNet.channels.printTable();
 
-    // Find path to make a transaction with linked Channels
-    let toSend = 0.1;
-    let sp_path = await spriteNet.findShortestPathWithCapacity(players[0].address, players[totalPlayers - 1].address, toSend);
-    let lg_path = await lightningNet.findShortestPathWithCapacity(players[0].address, players[totalPlayers - 1].address, toSend);
+    //set Agents
+    spriteNet.addAgent(players[0]);
+    spriteNet.addAgent(players[1]);
 
 
-    let petty_rates = [0.0,0.1,0.2,0.3,0.4,0.5];
-    let spriteTimes = [];
-    let lightningTimes = [];
-
-    for (petty_rate of petty_rates) {
-        // // Perform transactions on SpriteNet
-        spriteTimes.push ( await performTransactions("sprites", sp_path, petty_rate) );
-        // // Perform transactions on LightningNet
-        lightningTimes.push ( await performTransactions("lightning", lg_path, petty_rate) );
+    //create channels between GPM account and agents
+    for (const agent of spriteNet.agents) {
+        await spriteNet.createChannel(
+            [spriteNet.GPMAccount, agent], //sender recipient
+            ["1000", "0"],// balance
+            spriteNet.agentChannels // channelType
+        );
     }
 
-    //sprites time
-    console.log("\nSpriteNet times: ")
-    for (let i = 0; i < petty_rates.length; i++) {
-        console.log(`Petty rate: ${petty_rates[i]}\t time: ${spriteTimes[i]} ms`);
+    //Print Agent Channels
+    spriteNet.agentChannels.printTable();
+
+    // anonPlayer want to send crypto to recipient
+    let toSend = 1;
+    let recipient = players[3].address;
+
+    //get the min path from agents to recipient
+    let minPathSize = 1000000;
+    let minIndex = 0;
+    let minPath;
+
+    for (let i = 0; i < spriteNet.agents.length; i++) {
+        let path = await spriteNet.findShortestPathWithCapacity(spriteNet.agents[i].address, recipient, toSend);
+        //choose the min path to be eficient
+        if (path.length < minPathSize) {
+            minPathSize = path.length;
+            minIndex = i;
+            minPath = path;
+        }
     }
 
-     //Lightning time
-     console.log("\nLightning times: ")
-     for (let i = 0; i < petty_rates.length; i++) {
-         console.log(`Petty rate: ${petty_rates[i]}\t time: ${lightningTimes[i]} ms`);
-     }
 
-    
+    console.log("minPath: ", minPathSize);
 
+
+    //make transactions if exists a path 
+    if (minPath.length > 0)
+    {
+
+        //AnonPlayer create a channel with GMP account
+        let amountToSend = toSend + toSend * 0.04; // 4% fee
+
+        await spriteNet.createChannel(
+            [anonPlayer, GPMAccount], //sender - recipient
+            [amountToSend.toString(), "0"],// balance
+            spriteNet.agentChannels // channelType
+        );
+
+        //AnonPlayer send crypto to GMP account
+        let ch = spriteNet.agentChannels.get(anonPlayer.address).head.data;
+        await ch.makeTransaction(
+            anonPlayer.address, //sender
+            spriteNet.GPM.address,//recipient
+            amountToSend.toString()// amount with 4% fee
+        );
+     
+
+        //GMP Account send crypto to agent with the shortest path
+        for( let ch_ of spriteNet.agentChannels.get(spriteNet.GPMAccount.address)){
+            const recipient = await ch_.getAddressRecipient(spriteNet.GPMAccount.address);
+            //find channel between GPM and agent
+            if(recipient === spriteNet.agents[minIndex].address){
+                ch = ch_;
+                console.log("recipient: ", recipient);
+                break;
+            }
+        }
+        await ch.makeTransaction(
+            spriteNet.GPMAccount.address, //sender
+            spriteNet.agents[minIndex].address,//recipient
+            amountToSend.toString()
+        );
+
+
+        //now the agent can make the transactions
+        for( let i = 0; i < minPath.length; i++)
+        {
+            let chunk = minPath[i];
+            await chunk.channel.makeTransaction(chunk.sender, chunk.recipient, chunk.amount.toString());
+        }
+
+        console.log("completed");
+
+
+    } else {
+        console.log("no path");
+    }
 
     // Close the channel
     // await channel.close();

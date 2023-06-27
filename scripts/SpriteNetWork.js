@@ -7,23 +7,38 @@ class SpriteNetwork {
     //channels adress -> channel
     channels = new HashTable();
 
+    //Agents make transactions aynchronously
+    agents = []
+
+    //channels adress -> channel
+    agentChannels = new HashTable();
 
     //Global PreimageManager
     GPM = null;
 
+    //GPM account that will use to send transactions to agents
+    GPMAccount = null;
+
     //nodos
-    constructor(_GPM) {
+    constructor(_GPM, GPMAccount) {
         this.GPM = _GPM;
         console.log("Network created");
+        this.GPMAccount = GPMAccount;
     }
 
-    
+    setAgents(agents_) {
+        this.agents = agents_;
+    }
+
+    addAgent(agent){
+        this.agents.push(agent);
+    }
 
     removeNode(adressPlayer) {
         this.nodes.remove(adressPlayer);
     }
 
-    async createChannel([player1, player2], [coins1, coins2]) {
+    async createChannel([player1, player2], [coins1, coins2], channelType= this.channels) {
 
         const players = [player1, player2]
 
@@ -43,8 +58,8 @@ class SpriteNetwork {
         const channel = new SpriteChannelContainer(players, spriteChannel, this.GPM);
 
         // add the bidirectional channel to the network
-        this.channels.set(player1.address, channel);
-        this.channels.set(player2.address, channel);
+        channelType.set(player1.address, channel);
+        channelType.set(player2.address, channel);
 
 
         console.log("Channel created: ", spriteChannel.address);

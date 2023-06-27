@@ -146,10 +146,6 @@ contract ConditionalChannel {
         if (r <= bestRound) return;
 
         //update checkpoint
-        //alice
-        // uint256 aliceCredit = playermap[players[direction[0]]].credit - amount;
-        // uint256 bobCredit = playermap[players[direction[1]]].credit + amount;
-
         playermap[players[direction[0]]].credit -= amount;
         playermap[players[direction[1]]].credit += amount;
 

@@ -10,7 +10,7 @@ interface PreimageManager {
     function getTimestamp(bytes32 x) external view returns (uint256);
 }
 
-// Note: Initial version does NOT support concurrent conditional payments!
+
 
 contract SpriteChannel {
     // Blocks for grace period
@@ -36,9 +36,6 @@ contract SpriteChannel {
         _;
     }
 
-    // function assert(bool b) internal pure {
-    //     require(b, "Assertion failed");
-    // }
 
     function max(uint256 a, uint256 b) internal pure returns (uint256) {
         return a > b ? a : b;
@@ -147,7 +144,6 @@ contract SpriteChannel {
         //verifiec with bob signature
         verifySignature(players[i], _h, V, R, S);
         
-
         // Update the state
         credits[0] = _credits[0];
         credits[1] = _credits[1];
@@ -174,16 +170,12 @@ contract SpriteChannel {
         require(status == Status.PENDING, "Invalid status");
         require(block.number > deadline, "Deadline not reached");
 
-        // Finalize is safe to call multiple times
-        // If "trigger" occurs before a hashlock expires, finalize will need to be called again
-        // Si se produce un "disparador" antes de que caduque un hashlock, será necesario volver a llamar a finalizar
-
         if (amount > 0 && block.number > expiry) {
             // Completes on-chain
             if (pm.revealedBefore(hash, expiry))
-                withdrawals[1] += amount;// bob could withdraw
+                withdrawals[1] += amount;// recipient could withdraw
                 // Cancels off-chain
-            else withdrawals[0] += amount; // alice cancel the payment
+            else withdrawals[0] += amount; // sender cancel the payment
             amount = 0;
             hash = 0;
             expiry = 0;
@@ -196,3 +188,5 @@ contract SpriteChannel {
         credits[1] = -int256(deposits[1]);
     }
 }
+
+
