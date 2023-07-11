@@ -1,11 +1,10 @@
-# SPRITES vs LIGHTNING
+# PORTAL
 
-This project made a Comparison between Second Layer Solutions
+Anonymous and syncronous state channels
 
-Try running some of the following tasks:
+Try running:
 ```shell
 npm install
 npx hardhat node
-npx hardhat run scripts/deploySprites.js
-npx hardhat run scripts/deployLightning.js
+npx hardhat run scripts/main.js
 ```
